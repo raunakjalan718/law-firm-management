@@ -99,7 +99,7 @@ Resources:
     Properties:
       DBInstanceIdentifier: !Sub '${EnvironmentName}-lawfirm-db'
       Engine: postgres
-      EngineVersion: '16.1'
+      EngineVersion: '16.9'
       DBInstanceClass: db.t4g.micro
       AllocatedStorage: '20'
       DBName: lawfirmdb
