@@ -8,7 +8,13 @@ import AppointmentsPage from './pages/AppointmentsPage'
 import DocumentsPage from './pages/DocumentsPage'
 import Layout from './pages/Layout'
 
-const isAuthenticated = () => Boolean(localStorage.getItem('token'))
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const token = localStorage.getItem('token')
+  if (!token) {
+    return <Navigate to="/login" replace />
+  }
+  return <Layout>{children}</Layout>
+}
 
 export default function App() {
   return (
@@ -16,27 +22,27 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route
         path="/"
-        element={isAuthenticated() ? <Layout><DashboardPage /></Layout> : <Navigate to="/login" replace />}
+        element={<ProtectedRoute><DashboardPage /></ProtectedRoute>}
       />
       <Route
         path="/clients"
-        element={isAuthenticated() ? <Layout><ClientsPage /></Layout> : <Navigate to="/login" replace />}
+        element={<ProtectedRoute><ClientsPage /></ProtectedRoute>}
       />
       <Route
         path="/lawyers"
-        element={isAuthenticated() ? <Layout><LawyersPage /></Layout> : <Navigate to="/login" replace />}
+        element={<ProtectedRoute><LawyersPage /></ProtectedRoute>}
       />
       <Route
         path="/cases"
-        element={isAuthenticated() ? <Layout><CasesPage /></Layout> : <Navigate to="/login" replace />}
+        element={<ProtectedRoute><CasesPage /></ProtectedRoute>}
       />
       <Route
         path="/appointments"
-        element={isAuthenticated() ? <Layout><AppointmentsPage /></Layout> : <Navigate to="/login" replace />}
+        element={<ProtectedRoute><AppointmentsPage /></ProtectedRoute>}
       />
       <Route
         path="/documents"
-        element={isAuthenticated() ? <Layout><DocumentsPage /></Layout> : <Navigate to="/login" replace />}
+        element={<ProtectedRoute><DocumentsPage /></ProtectedRoute>}
       />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

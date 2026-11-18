@@ -1,1 +1,0 @@
-{"root":["./src/app.tsx","./src/api.ts","./src/main.tsx","./src/types.ts","./src/vite-env.d.ts","./src/pages/appointmentspage.tsx","./src/pages/casespage.tsx","./src/pages/clientspage.tsx","./src/pages/dashboardpage.tsx","./src/pages/documentspage.tsx","./src/pages/lawyerspage.tsx","./src/pages/layout.tsx","./src/pages/loginpage.tsx"],"version":"5.9.3"}

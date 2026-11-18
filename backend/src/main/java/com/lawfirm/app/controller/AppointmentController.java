@@ -23,6 +23,11 @@ public class AppointmentController {
         return ResponseEntity.ok(appointmentService.findAll());
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<AppointmentDto> get(@PathVariable Long id) {
+        return ResponseEntity.ok(appointmentService.findById(id));
+    }
+
     @PostMapping
     public ResponseEntity<AppointmentDto> create(@RequestBody AppointmentDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(appointmentService.save(dto));
@@ -32,5 +37,11 @@ public class AppointmentController {
     public ResponseEntity<AppointmentDto> update(@PathVariable Long id, @RequestBody AppointmentDto dto) {
         dto.setId(id);
         return ResponseEntity.ok(appointmentService.save(dto));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        appointmentService.delete(id);
+        return ResponseEntity.noContent().build();
     }
 }

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lawfirm
+  labels:
+    app.kubernetes.io/name: lawfirm-system
+    app.kubernetes.io/part-of: lawfirm-management

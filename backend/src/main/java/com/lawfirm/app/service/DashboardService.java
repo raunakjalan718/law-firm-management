@@ -45,16 +45,27 @@ public class DashboardService {
         dto.setTotalLawyers(lawyerRepository.count());
         dto.setTotalActiveCases(legalCaseRepository.findByStatus(CaseStatus.ACTIVE).size());
         dto.setTotalClosedCases(legalCaseRepository.findByStatus(CaseStatus.CLOSED).size());
-        dto.setUpcomingHearings(legalCaseRepository.findAll().stream().filter(c -> c.getNextHearingDate() != null && c.getNextHearingDate().isAfter(LocalDate.now())).count());
-        dto.setTodaysAppointments(appointmentRepository.findAll().stream().filter(a -> a.getDate().equals(LocalDate.now())).count());
+        dto.setUpcomingHearings(legalCaseRepository.findAll().stream()
+            .filter(c -> c.getNextHearingDate() != null && c.getNextHearingDate().isAfter(LocalDate.now()))
+            .count());
+        dto.setTodaysAppointments(appointmentRepository.findAll().stream()
+            .filter(a -> a.getDate() != null && a.getDate().equals(LocalDate.now()))
+            .count());
 
         List<LegalCase> recentCases = legalCaseRepository.findAll().stream()
-            .sorted((a, b) -> b.getFilingDate().compareTo(a.getFilingDate()))
+            .sorted((a, b) -> {
+                if (a.getFilingDate() == null && b.getFilingDate() == null) return 0;
+                if (a.getFilingDate() == null) return 1;
+                if (b.getFilingDate() == null) return -1;
+                return b.getFilingDate().compareTo(a.getFilingDate());
+            })
             .limit(5)
             .collect(Collectors.toList());
         dto.setRecentCases(recentCases.stream().map(this::toCaseDto).collect(Collectors.toList()));
 
-        dto.setRecentActivities(activityLogRepository.findTop10ByOrderByCreatedAtDesc().stream().map(this::toActivityDto).collect(Collectors.toList()));
+        dto.setRecentActivities(activityLogRepository.findTop10ByOrderByCreatedAtDesc().stream()
+            .map(this::toActivityDto)
+            .collect(Collectors.toList()));
 
         Map<String, Long> distribution = new LinkedHashMap<>();
         for (CaseStatus status : CaseStatus.values()) {
@@ -66,7 +77,11 @@ public class DashboardService {
         List<MonthlyCaseDto> monthly = new ArrayList<>();
         for (int i = 0; i < 6; i++) {
             LocalDate month = LocalDate.now().minusMonths(i);
-            long count = legalCaseRepository.findAll().stream().filter(c -> c.getFilingDate() != null && c.getFilingDate().getMonthValue() == month.getMonthValue() && c.getFilingDate().getYear() == month.getYear()).count();
+            long count = legalCaseRepository.findAll().stream()
+                .filter(c -> c.getFilingDate() != null &&
+                             c.getFilingDate().getMonthValue() == month.getMonthValue() &&
+                             c.getFilingDate().getYear() == month.getYear())
+                .count();
             MonthlyCaseDto item = new MonthlyCaseDto();
             item.setMonth(month.getMonth().name().substring(0, 3));
             item.setCount(count);
@@ -83,7 +98,7 @@ public class DashboardService {
         dto.setTitle(legalCase.getTitle());
         dto.setCaseType(legalCase.getCaseType());
         dto.setClientName(legalCase.getClient() != null ? legalCase.getClient().getFullName() : null);
-        dto.setStatus(legalCase.getStatus().name());
+        dto.setStatus(legalCase.getStatus() != null ? legalCase.getStatus().name() : "PENDING");
         return dto;
     }
 

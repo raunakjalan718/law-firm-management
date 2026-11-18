@@ -21,23 +21,37 @@ public class AppointmentService {
     private final ClientRepository clientRepository;
     private final LawyerRepository lawyerRepository;
     private final LegalCaseRepository legalCaseRepository;
+    private final ActivityService activityService;
 
-    public AppointmentService(AppointmentRepository appointmentRepository, ClientRepository clientRepository, LawyerRepository lawyerRepository, LegalCaseRepository legalCaseRepository) {
+    public AppointmentService(AppointmentRepository appointmentRepository,
+                              ClientRepository clientRepository,
+                              LawyerRepository lawyerRepository,
+                              LegalCaseRepository legalCaseRepository,
+                              ActivityService activityService) {
         this.appointmentRepository = appointmentRepository;
         this.clientRepository = clientRepository;
         this.lawyerRepository = lawyerRepository;
         this.legalCaseRepository = legalCaseRepository;
+        this.activityService = activityService;
     }
 
     public List<AppointmentDto> findAll() {
         return appointmentRepository.findAll().stream().map(this::toDto).collect(Collectors.toList());
     }
 
+    public AppointmentDto findById(Long id) {
+        return toDto(appointmentRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Appointment not found with id: " + id)));
+    }
+
     public AppointmentDto save(AppointmentDto dto) {
-        Appointment appointment = dto.getId() != null ? appointmentRepository.findById(dto.getId()).orElse(new Appointment()) : new Appointment();
+        boolean isNew = (dto.getId() == null);
+        Appointment appointment = !isNew ? appointmentRepository.findById(dto.getId()).orElse(new Appointment()) : new Appointment();
         Client client = clientRepository.findById(dto.getClientId()).orElseThrow(() -> new IllegalArgumentException("Client not found"));
         Lawyer lawyer = lawyerRepository.findById(dto.getLawyerId()).orElseThrow(() -> new IllegalArgumentException("Lawyer not found"));
-        LegalCase legalCase = dto.getCaseId() != null ? legalCaseRepository.findById(dto.getCaseId()).orElse(null) : null;
+        LegalCase legalCase = (dto.getCaseId() != null && dto.getCaseId() > 0)
+            ? legalCaseRepository.findById(dto.getCaseId()).orElse(null)
+            : null;
 
         appointment.setClient(client);
         appointment.setLawyer(lawyer);
@@ -47,11 +61,29 @@ public class AppointmentService {
         appointment.setLocation(dto.getLocation());
         appointment.setAppointmentType(dto.getAppointmentType());
         appointment.setDescription(dto.getDescription());
-        if (dto.getStatus() != null) {
-            appointment.setStatus(AppointmentStatus.valueOf(dto.getStatus().toUpperCase()));
+        if (dto.getStatus() != null && !dto.getStatus().isBlank()) {
+            try {
+                appointment.setStatus(AppointmentStatus.valueOf(dto.getStatus().toUpperCase()));
+            } catch (IllegalArgumentException e) {
+                appointment.setStatus(AppointmentStatus.SCHEDULED);
+            }
         }
 
-        return toDto(appointmentRepository.save(appointment));
+        Appointment saved = appointmentRepository.save(appointment);
+        activityService.log(
+            lawyer.getFullName(),
+            isNew ? "Create Appointment" : "Update Appointment",
+            "Appointment for " + client.getFullName() + " on " + saved.getDate() + " (" + saved.getStatus() + ")"
+        );
+        return toDto(saved);
+    }
+
+    public void delete(Long id) {
+        Appointment appointment = appointmentRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Appointment not found with id: " + id));
+        String clientName = appointment.getClient() != null ? appointment.getClient().getFullName() : "Unknown";
+        appointmentRepository.delete(appointment);
+        activityService.log("System", "Cancel Appointment", "Cancelled appointment for " + clientName);
     }
 
     private AppointmentDto toDto(Appointment appointment) {
@@ -67,7 +99,7 @@ public class AppointmentService {
         dto.setLocation(appointment.getLocation());
         dto.setAppointmentType(appointment.getAppointmentType());
         dto.setDescription(appointment.getDescription());
-        dto.setStatus(appointment.getStatus().name());
+        dto.setStatus(appointment.getStatus() != null ? appointment.getStatus().name() : AppointmentStatus.SCHEDULED.name());
         return dto;
     }
 }

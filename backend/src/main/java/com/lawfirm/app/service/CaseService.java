@@ -9,6 +9,7 @@ import com.lawfirm.app.repository.ClientRepository;
 import com.lawfirm.app.repository.LegalCaseRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -19,11 +20,16 @@ public class CaseService {
     private final LegalCaseRepository legalCaseRepository;
     private final ClientRepository clientRepository;
     private final LawyerService lawyerService;
+    private final ActivityService activityService;
 
-    public CaseService(LegalCaseRepository legalCaseRepository, ClientRepository clientRepository, LawyerService lawyerService) {
+    public CaseService(LegalCaseRepository legalCaseRepository,
+                       ClientRepository clientRepository,
+                       LawyerService lawyerService,
+                       ActivityService activityService) {
         this.legalCaseRepository = legalCaseRepository;
         this.clientRepository = clientRepository;
         this.lawyerService = lawyerService;
+        this.activityService = activityService;
     }
 
     public List<LegalCaseDto> findAll() {
@@ -31,28 +37,45 @@ public class CaseService {
     }
 
     public LegalCaseDto save(LegalCaseDto dto) {
-        LegalCase legalCase = dto.getId() != null ? legalCaseRepository.findById(dto.getId()).orElse(new LegalCase()) : new LegalCase();
+        boolean isNew = (dto.getId() == null);
+        LegalCase legalCase = !isNew ? legalCaseRepository.findById(dto.getId()).orElse(new LegalCase()) : new LegalCase();
         Client client = clientRepository.findById(dto.getClientId()).orElseThrow(() -> new IllegalArgumentException("Client not found"));
         legalCase.setClient(client);
         legalCase.setCaseNumber(dto.getCaseNumber());
         legalCase.setTitle(dto.getTitle());
         legalCase.setCaseType(dto.getCaseType());
         legalCase.setCourtName(dto.getCourtName());
-        legalCase.setFilingDate(dto.getFilingDate());
+        legalCase.setFilingDate(dto.getFilingDate() != null ? dto.getFilingDate() : LocalDate.now());
         legalCase.setNextHearingDate(dto.getNextHearingDate());
-        legalCase.setDescription(dto.getDescription());
-        if (dto.getStatus() != null) {
-            legalCase.setStatus(CaseStatus.valueOf(dto.getStatus().toUpperCase().replace(' ', '_')));
+        legalCase.setDescription(dto.getDescription() != null ? dto.getDescription() : "");
+
+        if (dto.getStatus() != null && !dto.getStatus().isBlank()) {
+            try {
+                legalCase.setStatus(CaseStatus.valueOf(dto.getStatus().toUpperCase().replace(' ', '_')));
+            } catch (IllegalArgumentException e) {
+                legalCase.setStatus(CaseStatus.ACTIVE);
+            }
+        } else {
+            legalCase.setStatus(CaseStatus.ACTIVE);
         }
 
         Set<Lawyer> lawyers = new HashSet<>();
         if (dto.getLawyerIds() != null) {
             for (Long lawyerId : dto.getLawyerIds()) {
-                lawyers.add(lawyerService.findEntityById(lawyerId));
+                if (lawyerId != null && lawyerId > 0) {
+                    lawyers.add(lawyerService.findEntityById(lawyerId));
+                }
             }
         }
         legalCase.setLawyers(lawyers);
-        return toDto(legalCaseRepository.save(legalCase));
+
+        LegalCase saved = legalCaseRepository.save(legalCase);
+        activityService.log(
+            "System",
+            isNew ? "Register Case" : "Update Case",
+            (isNew ? "Registered case: " : "Updated case: ") + saved.getCaseNumber() + " - " + saved.getTitle()
+        );
+        return toDto(saved);
     }
 
     public LegalCaseDto findById(Long id) {
@@ -60,7 +83,10 @@ public class CaseService {
     }
 
     public void delete(Long id) {
-        legalCaseRepository.deleteById(id);
+        LegalCase legalCase = legalCaseRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Case not found"));
+        String caseNum = legalCase.getCaseNumber();
+        legalCaseRepository.delete(legalCase);
+        activityService.log("System", "Close Case", "Deleted/closed case: " + caseNum);
     }
 
     private LegalCaseDto toDto(LegalCase legalCase) {
@@ -75,7 +101,7 @@ public class CaseService {
         dto.setFilingDate(legalCase.getFilingDate());
         dto.setNextHearingDate(legalCase.getNextHearingDate());
         dto.setDescription(legalCase.getDescription());
-        dto.setStatus(legalCase.getStatus().name());
+        dto.setStatus(legalCase.getStatus() != null ? legalCase.getStatus().name() : CaseStatus.PENDING.name());
         if (legalCase.getLawyers() != null) {
             dto.setLawyerIds(legalCase.getLawyers().stream().map(Lawyer::getId).collect(Collectors.toSet()));
         }
